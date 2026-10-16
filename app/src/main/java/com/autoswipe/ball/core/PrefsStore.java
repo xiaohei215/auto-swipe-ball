@@ -24,6 +24,7 @@ public final class PrefsStore {
     private static final String K_UPDATE_BRANCH = "update_source_branch";
     private static final String K_UPDATE_CUSTOM = "update_source_custom";
     private static final String K_UPDATE_WIFI_ONLY = "update_wifi_only";
+    private static final String K_UPDATE_AUTO_CHECK = "update_auto_check";
     private static final String K_UPDATE_CHECKED_AT = "update_checked_at";
 
     private PrefsStore() {
@@ -125,6 +126,20 @@ public final class PrefsStore {
 
     public static void setUpdateWifiOnly(Context ctx, boolean value) {
         sp(ctx).edit().putBoolean(K_UPDATE_WIFI_ONLY, value).apply();
+    }
+
+    /**
+     * 是否在打开应用时自动检查更新（默认开启）。
+     *
+     * <p>关掉之后应用不会主动发起任何网络请求，只有你亲手点「检查更新」时才会联网。
+     * 这是「要不要联网」这件事的最终开关。</p>
+     */
+    public static boolean isUpdateAutoCheck(Context ctx) {
+        return sp(ctx).getBoolean(K_UPDATE_AUTO_CHECK, true);
+    }
+
+    public static void setUpdateAutoCheck(Context ctx, boolean value) {
+        sp(ctx).edit().putBoolean(K_UPDATE_AUTO_CHECK, value).apply();
     }
 
     /** 上次检查更新的时间戳（毫秒）；0 表示从未检查过。 */

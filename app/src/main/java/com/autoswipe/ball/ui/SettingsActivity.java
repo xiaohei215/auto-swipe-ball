@@ -57,6 +57,7 @@ public class SettingsActivity extends Activity {
     private RadioButton rbSourceGithub;
     private RadioButton rbSourceCustom;
     private EditText etUpdateCustom;
+    private CheckBox cbUpdateAutoCheck;
     private CheckBox cbUpdateWifiOnly;
     private TextView tvUpdateSourceDesc;
 
@@ -144,6 +145,7 @@ public class SettingsActivity extends Activity {
         rbSourceGithub = findViewById(R.id.rb_source_github);
         rbSourceCustom = findViewById(R.id.rb_source_custom);
         etUpdateCustom = findViewById(R.id.et_update_custom);
+        cbUpdateAutoCheck = findViewById(R.id.cb_update_auto_check);
         cbUpdateWifiOnly = findViewById(R.id.cb_update_wifi_only);
         tvUpdateSourceDesc = findViewById(R.id.tv_update_source_desc);
 
@@ -161,9 +163,14 @@ public class SettingsActivity extends Activity {
                 break;
         }
         etUpdateCustom.setText(current.customBaseUrl);
+        cbUpdateAutoCheck.setChecked(PrefsStore.isUpdateAutoCheck(this));
         cbUpdateWifiOnly.setChecked(PrefsStore.isUpdateWifiOnly(this));
 
         rgUpdateSource.setOnCheckedChangeListener((group, checkedId) -> renderUpdateSource());
+        cbUpdateAutoCheck.setOnCheckedChangeListener((buttonView, checked) -> {
+            PrefsStore.setUpdateAutoCheck(this, checked);
+            renderUpdateSource();
+        });
         cbUpdateWifiOnly.setOnCheckedChangeListener((buttonView, checked) ->
                 PrefsStore.setUpdateWifiOnly(this, checked));
         findViewById(R.id.btn_save_source).setOnClickListener(v -> saveUpdateSource());
@@ -172,6 +179,9 @@ public class SettingsActivity extends Activity {
     }
 
     private void renderUpdateSource() {
+        boolean autoCheck = cbUpdateAutoCheck.isChecked();
+        // 不自动检查时，「仅 Wi-Fi」这个约束就没有意义了
+        cbUpdateWifiOnly.setEnabled(autoCheck);
         etUpdateCustom.setEnabled(rbSourceCustom.isChecked());
         tvUpdateSourceDesc.setText(getString(R.string.fmt_update_source,
                 sourceFromUi().describe()));
@@ -200,6 +210,7 @@ public class SettingsActivity extends Activity {
             return;
         }
         PrefsStore.saveUpdateSource(this, source);
+        PrefsStore.setUpdateAutoCheck(this, cbUpdateAutoCheck.isChecked());
         PrefsStore.setUpdateWifiOnly(this, cbUpdateWifiOnly.isChecked());
         Toast.makeText(this, R.string.toast_source_saved, Toast.LENGTH_SHORT).show();
         renderUpdateSource();

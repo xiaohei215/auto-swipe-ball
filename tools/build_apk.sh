@@ -71,8 +71,8 @@ KEYTOOL="$JDK_HOME/bin/keytool.exe"
 PY="${PYTHON:-$(command -v python || command -v python3)}"
 
 APP_NAME="AutoSwipeBall"
-VERSION_NAME="1.0.3"
-VERSION_CODE=5
+VERSION_NAME="1.0.4"
+VERSION_CODE=7
 MIN_SDK=26
 TARGET_SDK=34
 PKG="com.autoswipe.ball"

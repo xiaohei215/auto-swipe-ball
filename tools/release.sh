@@ -25,6 +25,8 @@ set -euo pipefail
 PROJ="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJ"
 
+TC="${TOOLCHAIN:-E:/workbuddy-toolchain}"
+
 VER="${1:-}"
 NOTES="${2:-}"
 PUSH=1
@@ -61,13 +63,34 @@ if [ -z "$PY" ]; then
 fi
 
 OLD_CODE="$(grep -E '^VERSION_CODE=' tools/build_apk.sh | head -1 | cut -d= -f2)"
+# 去掉可能残留的空白/回车（文件若是 CRLF，grep 出来的行尾会带 \r，
+# 而 bash 的 $(( )) 遇到 \r 会直接报算术错误）
+OLD_CODE="$(printf '%s' "$OLD_CODE" | tr -d '[:space:]')"
+
 if ! printf '%s' "$OLD_CODE" | grep -qE '^[0-9]+$'; then
-  echo "[FAIL] 无法从 tools/build_apk.sh 读出 VERSION_CODE"
+  echo "[FAIL] 无法从 tools/build_apk.sh 读出 VERSION_CODE（读到的是「$OLD_CODE」）"
   exit 1
 fi
 NEW_CODE=$((OLD_CODE + 1))
 
-echo "==> [1/6] 版本号：$VER（versionCode $OLD_CODE -> $NEW_CODE）"
+# ---------------------------------------------------------------------------
+# 幂等保护
+#
+# 本脚本的「读版本号 -> +1 -> 写回」是有副作用的。若脚本因故被执行两次
+# （中断重跑、误重复执行），versionCode 就会多跳一格。跳号本身对 Android 无害
+# （只要求单调递增），但会让版本记录对不上，排查起来很烦。
+#
+# 所以这里做个判断：如果文件里的版本名已经等于目标版本，说明本次发版已经改过
+# 一次，直接沿用现有 versionCode，不再自增。
+# ---------------------------------------------------------------------------
+CUR_NAME="$(grep -E '^VERSION_NAME=' tools/build_apk.sh | head -1 | cut -d= -f2 \
+            | tr -d '[:space:]"')"
+if [ "$CUR_NAME" = "$VER" ]; then
+  echo "==> [1/6] 版本号：$VER（检测到已是该版本，按「重跑」处理：versionCode 保持 $OLD_CODE 不自增）"
+  NEW_CODE="$OLD_CODE"
+else
+  echo "==> [1/6] 版本号：$VER（versionCode $OLD_CODE -> $NEW_CODE）"
+fi
 "$PY" - "$VER" "$NEW_CODE" <<'PYEOF'
 import io, re, sys
 
@@ -138,7 +161,35 @@ print("       notes=%s" % (notes if notes else "(空)"))
 PYEOF
 
 echo
-echo "==> [4/6] 清理临时文件"
+echo "==> [4/6] 交叉校验：APK 内嵌的版本号必须与元数据一致"
+AAPT2="$TC/android-sdk/build-tools/34.0.0/aapt2.exe"
+if [ -f "$AAPT2" ]; then
+  APK_CODE="$("$AAPT2" dump badging "$APK" 2>/dev/null | head -1 \
+              | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")"
+  META_CODE="$("$PY" -c "import io,json;print(json.load(io.open('dist/version.json',encoding='utf-8'))['versionCode'])")"
+  echo "       APK 内嵌 versionCode = $APK_CODE"
+  echo "       version.json         = $META_CODE"
+  if [ "$APK_CODE" != "$META_CODE" ]; then
+    cat >&2 <<EOM
+
+[FAIL] 两者不一致，已中止提交。
+
+       手机是靠 version.json 里的 versionCode 判断新旧的：
+       若它比 APK 里实际的小，装了新版也仍会被提示「有新版本」；
+       若比它大，则永远提示「已是最新」，更新推不下去。
+
+       请检查 tools/build_apk.sh 与 app/build.gradle 的版本号是否同步，
+       或先 git checkout 掉本次改动后重来。
+EOM
+    exit 1
+  fi
+  echo "       一致，可以发布"
+else
+  echo "       （未找到 aapt2，跳过校验）"
+fi
+
+echo
+echo "==> [5/6] 清理临时文件"
 rm -f dist/*.idsig
 echo "       已删除 dist/*.idsig"
 

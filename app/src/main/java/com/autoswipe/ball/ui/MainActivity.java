@@ -286,6 +286,10 @@ public class MainActivity extends Activity implements StateHub.Observer {
         if (updateBusy || pendingUpdate != null) {
             return;
         }
+        // 总开关：关掉之后应用不会主动发起任何网络请求
+        if (!PrefsStore.isUpdateAutoCheck(this)) {
+            return;
+        }
         long elapsed = System.currentTimeMillis() - PrefsStore.lastUpdateCheckAt(this);
         if (elapsed < AUTO_CHECK_INTERVAL_MS) {
             return;
