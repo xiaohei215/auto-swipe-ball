@@ -14,7 +14,14 @@
 #     3. 调用 tools/build_apk.sh 出包
 #     4. 计算 APK 的 SHA-256 与字节数，写出 dist/version.json
 #        —— 应用内「检查更新」读的就是这个文件
-#     5. git commit + push（推送走本仓库已配置好的 SSH）
+#     5. git commit + 推送到【所有】已配置的远端
+#        （GitHub 做代码备份、Gitee 做应用实际读取的更新源，两个都必须推；
+#          漏推 Gitee 会让手机端永远等不到新版本）
+#
+#   两个远端缺一不可：
+#     origin -> GitHub，用于代码归档与浏览
+#     gitee  -> Gitee，应用内「检查更新」实际读取的就是它
+#   本脚本会遍历所有远端逐个推送，任一失败即报错退出（本地提交保留，可手动补推）。
 #
 #   为什么更新元数据放在仓库里而不是 GitHub Releases：
 #     下载走 gitee/github 的「原始文件」地址即可，不需要 API token，
@@ -204,12 +211,38 @@ else
 fi
 
 echo
-echo "==> [6/6] 推送"
+echo "==> [6/6] 推送到所有远端"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$PUSH" = "1" ]; then
-  git push
-  echo "       已推送。手机端下次检查更新即可看到 v$VER。"
+  FAILED=""
+  for r in $(git remote); do
+    printf '     %-10s ' "$r"
+    if git push "$r" "$BRANCH" >/dev/null 2>&1; then
+      echo "已推送"
+    else
+      echo "失败"
+      FAILED="$FAILED $r"
+    fi
+  done
+  if [ -n "$FAILED" ]; then
+    cat >&2 <<EOM
+
+[FAIL] 以下远端推送失败：$FAILED
+
+       提交已存在于本地，但远端未更新 —— 手机端不会看到新版本。
+       排查网络或凭据后手动补推：
+
+         git push <远端名> $BRANCH
+EOM
+    exit 1
+  fi
+  echo
+  echo "       全部远端已同步。手机端稍后（Gitee 约 45 秒缓存后）即可看到 v$VER。"
 else
-  echo "       已按 --no-push 跳过。手动推送：git push"
+  echo "       已按 --no-push 跳过。需要时手动推送："
+  for r in $(git remote); do
+    echo "         git push $r $BRANCH"
+  done
 fi
 
 echo
