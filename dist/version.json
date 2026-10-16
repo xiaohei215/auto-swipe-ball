@@ -1,8 +1,8 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.4",
-  "apkFileName": "AutoSwipeBall-1.0.4.apk",
+  "versionCode": 8,
+  "versionName": "1.0.5",
+  "apkFileName": "AutoSwipeBall-1.0.5.apk",
   "sizeBytes": 74731,
-  "sha256": "2da03342c1091c6f82ae300508c0f61f2f3b4151f82a8210f1891896331004d2",
-  "notes": "新增应用内检查更新：首页可检查并下载新版本，支持 Gitee / GitHub / 自定义源切换；可关闭自动检查（关掉后应用不主动联网）"
+  "sha256": "0292f2e60203a7edcbef7f9b82193d64e65da0045217cdadf079dfeff71ce264",
+  "notes": "修正默认更新源地址：用户名改用 Gitee 的空间地址（此前误填了 GitHub 的用户名，导致手机上读不到版本信息）"
 }

@@ -427,17 +427,17 @@ public class CoreLogicTest {
     // ---------- 11. 更新源 URL 构造 ----------
 
     private static void testUpdateSourceUrls() {
-        UpdateSource gitee = UpdateSource.gitee("xiaohei215", "auto-swipe-ball", "main");
+        UpdateSource gitee = UpdateSource.gitee("xiaohei1234525", "auto-swipe-ball", "main");
         check("源: Gitee 元数据 URL",
-                "https://gitee.com/xiaohei215/auto-swipe-ball/raw/main/dist/version.json"
+                "https://gitee.com/xiaohei1234525/auto-swipe-ball/raw/main/dist/version.json"
                         .equals(gitee.metaUrl()));
         check("源: Gitee APK URL",
-                "https://gitee.com/xiaohei215/auto-swipe-ball/raw/main/dist/AutoSwipeBall-1.0.3.apk"
+                "https://gitee.com/xiaohei1234525/auto-swipe-ball/raw/main/dist/AutoSwipeBall-1.0.3.apk"
                         .equals(gitee.apkUrl("AutoSwipeBall-1.0.3.apk")));
         check("源: Gitee 只带 User-Agent", gitee.requestHeaders().size() == 1);
         check("源: Gitee 配置完整", gitee.isConfigured());
 
-        UpdateSource github = UpdateSource.github("xiaohei215", "auto-swipe-ball", "main");
+        UpdateSource github = UpdateSource.github("xiaohei1234525", "auto-swipe-ball", "main");
         check("源: GitHub 走 api 域名（raw 域名在国内常不可达）",
                 github.metaUrl().startsWith("https://api.github.com/repos/"));
         check("源: GitHub 带 ref 参数", github.metaUrl().endsWith("?ref=main"));
@@ -469,7 +469,7 @@ public class CoreLogicTest {
                 UpdateSource.Kind.GITEE == UpdateSource.Kind.fromName("nope"));
 
         check("源: sameAs 识别相同配置", gitee.sameAs(
-                UpdateSource.gitee("xiaohei215", "auto-swipe-ball", "main")));
+                UpdateSource.gitee("xiaohei1234525", "auto-swipe-ball", "main")));
         check("源: sameAs 识别不同配置", !gitee.sameAs(github));
         check("源: sameAs 对 null 为假", !gitee.sameAs(null));
     }
@@ -495,7 +495,7 @@ public class CoreLogicTest {
                 source.apkUrl(info.apkFileName).endsWith("/dist/" + info.apkFileName));
         check("闭环: 能识别出有新版", info.isNewerThan(3));
         check("闭环: 换成 GitHub 源同样能拼出地址",
-                UpdateSource.github("xiaohei215", "auto-swipe-ball", "main")
+                UpdateSource.github("xiaohei1234525", "auto-swipe-ball", "main")
                         .apkUrl(info.apkFileName).contains("/contents/dist/"));
     }
 

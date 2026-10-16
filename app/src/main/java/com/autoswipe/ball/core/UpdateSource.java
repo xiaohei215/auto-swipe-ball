@@ -37,7 +37,17 @@ public final class UpdateSource {
         }
     }
 
-    public static final String DEFAULT_OWNER = "xiaohei215";
+    /**
+     * 默认仓库所有者 —— Gitee 的「个人空间地址」（即 URL 里用的那段）。
+     *
+     * <p>注意：Gitee 上有两个名字，容易被混淆 ——
+     * <b>显示名</b>（如 {@code xiaohei123}）与<b>个人空间地址</b>（如 {@code xiaohei1234525}）。
+     * URL 里必须用后者，用显示名会 404。这里取的是空间地址。</p>
+     *
+     * <p>另外：GitHub 用的是另一个账号名。若将来要改用户名、换仓库名或换平台，
+     * 用设置里的「自定义地址」填完整 URL 即可，不必重新发版。</p>
+     */
+    public static final String DEFAULT_OWNER = "xiaohei1234525";
     public static final String DEFAULT_REPO = "auto-swipe-ball";
     public static final String DEFAULT_BRANCH = "main";
     public static final String DEFAULT_DIR = "dist";
@@ -135,7 +145,7 @@ public final class UpdateSource {
         return isSafeToken(owner) && isSafeToken(repo) && isSafeToken(branch) && isSafeToken(assetDir);
     }
 
-    /** 供界面展示的简短描述，例如 {@code gitee.com/xiaohei215/auto-swipe-ball@main}。 */
+    /** 供界面展示的简短描述，例如 {@code gitee.com/xiaohei1234525/auto-swipe-ball@main}。 */
     public String describe() {
         switch (kind) {
             case GITHUB:
