@@ -7,12 +7,30 @@
 #         -> 塞回 APK -> zipalign -> apksigner 签名
 #
 #   用法：
-#     bash tools/build_apk.sh
+#     KEYSTORE_PASS='<签名密钥口令>' bash tools/build_apk.sh
 #   可用环境变量覆盖：
+#     KEYSTORE_PASS=<口令>                【必填】签名密钥口令
+#                                        刻意不写进源码 —— 本仓库是公开的，代码里不留任何口令
 #     TOOLCHAIN=E:/workbuddy-toolchain   （工具链根目录）
 #     KEYSTORE=<path>                    （自定义签名密钥，默认自动生成）
+#     JDK_HOME / ANDROID_SDK_ROOT        （工具链位置覆盖）
 # ============================================================================
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# 本脚本依赖 MSYS / Git-Bash 的路径自动转换：把 /e/xxx 转成 E:\xxx 再交给
+# javac / aapt2 / d8 / apksigner 这些原生 Windows 程序。
+# 若外部环境设了 MSYS_NO_PATHCONV=1（例如为了让 adb 的 /sdcard 参数不被改写），
+# 路径会原样传过去，Java 工具就会报
+#   FileNotFoundException: \e\workbuddy workplace\...
+# 这里临时关掉它，并明确提示，免得排查半天。
+# ---------------------------------------------------------------------------
+if [ -n "${MSYS_NO_PATHCONV:-}" ]; then
+  echo "[i] 检测到 MSYS_NO_PATHCONV=1：已在本脚本内部临时关闭。"
+  echo "    原因：本脚本要把 /e/xxx 形式的路径交给原生 Windows 工具，"
+  echo "    关掉路径转换会导致它们找不到文件。"
+  unset MSYS_NO_PATHCONV
+fi
 
 PROJ="$(cd "$(dirname "$0")/.." && pwd)"
 TC="${TOOLCHAIN:-E:/workbuddy-toolchain}"
@@ -20,6 +38,29 @@ JDK_HOME="${JDK_HOME:-$TC/jdk-17}"
 SDK="${ANDROID_SDK_ROOT:-$TC/android-sdk}"
 BT="$SDK/build-tools/34.0.0"
 PLATFORM_JAR="$SDK/platforms/android-34/android.jar"
+
+# ---------------------------------------------------------------------------
+# 签名口令：只从环境变量读，源码里不留任何口令（本仓库是公开的）
+# ---------------------------------------------------------------------------
+if [ -z "${KEYSTORE_PASS:-}" ]; then
+  cat >&2 <<'EOM'
+
+[FAIL] 未设置环境变量 KEYSTORE_PASS（签名密钥口令）。
+
+       本脚本刻意不把口令写进源码 —— 本仓库公开，代码里不留任何口令。
+       请这样调用：
+
+         KEYSTORE_PASS='你的口令' bash tools/build_apk.sh
+
+       若本机还没有签名密钥，脚本会在首次构建时自动生成一把，
+       并用你传入的这个口令保护它。
+
+       注意：若本机已有旧密钥，必须传入与它一致的口令，否则签名失败。
+       换口令 = 换密钥，装了旧包的设备会因签名不一致而无法覆盖升级。
+
+EOM
+  exit 1
+fi
 
 AAPT2="$BT/aapt2.exe"
 D8="$BT/d8.bat"
@@ -121,17 +162,19 @@ step "8/8 签名"
 KEYSTORE="${KEYSTORE:-$TC/autoswipe-release.jks}"
 if [ ! -f "$KEYSTORE" ]; then
   echo "首次构建，生成自签名密钥: $KEYSTORE"
+  # :env 修饰符让口令从环境变量读取，不出现在命令行参数里
+  # （避免被 ps 看到、或落进构建日志）
   "$KEYTOOL" -genkeypair -v \
     -keystore "$KEYSTORE" -alias autoswipe \
     -keyalg RSA -keysize 2048 -validity 10000 \
-    -storepass android -keypass android \
+    -storepass:env KEYSTORE_PASS -keypass:env KEYSTORE_PASS \
     -dname "CN=AutoSwipeBall, OU=Personal, O=Personal, L=NA, ST=NA, C=CN" >/dev/null 2>&1 \
     || { echo "[FAIL] 生成密钥失败"; exit 1; }
 fi
 FINAL="$DIST/${APP_NAME}-${VERSION_NAME}.apk"
 "$APKSIGNER" sign \
   --ks "$KEYSTORE" --ks-key-alias autoswipe \
-  --ks-pass pass:android --key-pass pass:android \
+  --ks-pass env:KEYSTORE_PASS --key-pass env:KEYSTORE_PASS \
   --v1-signing-enabled true --v2-signing-enabled true \
   --out "$FINAL" "$OUT/aligned.apk" \
   || { echo "[FAIL] 签名失败"; exit 1; }

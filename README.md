@@ -112,13 +112,22 @@ export TOOLCHAIN=<工具链目录>
 #   $TOOLCHAIN/android-sdk/build-tools/34.0.0   aapt2 / d8 / zipalign / apksigner
 #   $TOOLCHAIN/android-sdk/platforms/android-34 android.jar
 
-# 构建
-bash tools/build_apk.sh
+# 构建（签名口令必须通过环境变量传入，见下）
+KEYSTORE_PASS='<你的签名口令>' bash tools/build_apk.sh
 # 产物：dist/AutoSwipeBall-1.0.2.apk（首次会自动生成自签名密钥）
 ```
 
+> **关于签名口令**：脚本**不把口令写进源码**（本仓库是公开的），
+> 必须通过环境变量 `KEYSTORE_PASS` 传入，否则会直接报错退出。
+> 若本机还没有签名密钥，脚本会在首次构建时自动生成一把并用该口令保护它。
+> 内部实现用的是 keytool 的 `-storepass:env` 与 apksigner 的 `--ks-pass env:`，
+> **口令不会出现在命令行参数里**（避免被 `ps` 看到或落进构建日志）。
+
 > 脚本刻意把构建目录放在**不含空格**的路径下（`$TOOLCHAIN/work`），
 > 因为 `d8.bat` / `apksigner.bat` 对带空格的路径支持不佳。
+>
+> 另外脚本依赖 Git-Bash 的路径自动转换，若外部设了 `MSYS_NO_PATHCONV=1`，
+> 脚本会在内部临时关掉它（否则 Java 工具收到 `/e/xxx` 形式的路径会报文件找不到）。
 
 ### 方式 2：Android Studio
 
@@ -290,7 +299,9 @@ bash verify/run_verify.sh
 ### 7.1 APK 构建与产物校验（已于 2026-10-16 实际执行）
 
 工具链：JDK 17（Temurin 17.0.20.1）+ build-tools 34.0.0 + platforms;android-34，全部装在 `<工具链目录>/`。
-构建命令：`bash tools/build_apk.sh`，全链路无报错。
+构建命令：`KEYSTORE_PASS='<口令>' bash tools/build_apk.sh`，全链路无报错。
+（签名证书 SHA-256：`c809571d9f83f7121ddbb09cc75bde24413a1add9e54b24a54a68404d39d79e6`，
+改动口令读取方式后重新构建，指纹不变，可覆盖升级。）
 
 ```
 产物      dist/AutoSwipeBall-1.0.2.apk        54,251 字节
