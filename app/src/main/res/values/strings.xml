@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">自动上滑助手</string>
+
+    <!-- 通知 -->
+    <string name="notif_channel_name">自动上滑运行状态</string>
+    <string name="notif_channel_desc">显示悬浮球服务的运行状态与快捷退出入口</string>
+    <string name="notif_title">自动上滑助手正在运行</string>
+    <string name="notif_action_quit">退出</string>
+
+    <!-- 权限提示 -->
+    <string name="tip_need_overlay">请先开启「显示在其他应用上层」权限</string>
+    <string name="tip_need_accessibility">请先开启「自动上滑助手」无障碍服务</string>
+    <string name="tip_fault_overlay">悬浮窗权限已被回收，请重新授权后点击悬浮球恢复</string>
+    <string name="tip_fault_accessibility">无障碍服务已断开（多半是被系统清理时一起关掉了）。请在设置中重新开启，或做一次 ADB 授权让插件以后自动恢复</string>
+    <string name="tip_fault_gesture">手势注入连续失败，请检查无障碍服务是否被系统限制</string>
+    <string name="tip_service_interrupted">前台服务曾被系统中断（后台被清理），请点击悬浮球恢复运行</string>
+
+    <!-- 无障碍自愈 -->
+    <string name="fix_title">无障碍服务被系统关掉了</string>
+    <string name="fix_desc_auto">系统清理后台时（一键清理 / 强行停止 / 省电策略杀进程）会把无障碍服务一起关掉，这是 Android 的行为，不是插件的 bug。你已做过一次性授权，点下面的按钮就能自动恢复。</string>
+    <string name="fix_desc_manual">系统清理后台时（一键清理 / 强行停止 / 省电策略杀进程）会把无障碍服务一起关掉，这是 Android 的行为，不是插件的 bug。点「手动开启」会直接跳到本服务的开关页；或者做一次下面的 ADB 授权，以后就能自动恢复、不用再管。</string>
+    <string name="btn_auto_heal">一键自动恢复</string>
+    <string name="btn_manual_open">手动开启（直接跳到本服务开关）</string>
+    <string name="btn_app_info">查看应用详情</string>
+    <string name="adb_granted">已获得自动恢复授权，无障碍被关闭时会自动写回。</string>
+    <string name="adb_not_granted">当前未获授权：不影响正常使用，只是每次被清理后需要手动开一下无障碍。</string>
+    <string name="adb_hint_label">一次性授权方法（电脑上执行一次即可，之后长期有效）：</string>
+    <string name="adb_command">adb shell pm grant com.autoswipe.ball android.permission.WRITE_SECURE_SETTINGS</string>
+    <string name="adb_hint_restricted">提示：从浏览器/文件管理器侧载安装的应用，Android 13 起无障碍开关可能被「受限设置」拦住（开关点不动）。到应用详情右上角菜单点「允许受限设置」即可解除。</string>
+    <string name="adb_hint_keepalive">预防大于修复：在最近任务里给本应用「加锁」（上滑调出多任务 → 下拉卡片 → 点锁图标），「一键清理」就不会杀掉它，无障碍也就不会被关掉。</string>
+    <string name="toast_healing">检测到无障碍被系统关闭，正在自动恢复…</string>
+    <string name="toast_healed">已写回无障碍配置，正在等待系统绑定…</string>
+    <string name="toast_heal_failed">自动恢复失败，请点「手动开启」</string>
+    <string name="toast_heal_need_grant">还没做一次性授权，无法自动恢复，请先手动开启</string>
+    <string name="label_auto_heal">无障碍被系统关闭时自动恢复</string>
+    <string name="note_auto_heal">需要一次性 ADB 授权（见首页「无障碍服务被系统关掉了」卡片）；未授权时本项自动失效，不会有副作用。</string>
+
+    <!-- 其余原有提示 -->
+    <string name="toast_fault_prefix">已异常停止：%1$s</string>
+    <string name="toast_quit">已退出自动上滑</string>
+    <string name="toast_stopped">已停止悬浮球</string>
+    <string name="toast_ball_launched">悬浮球已就绪，单击悬浮球开始运行</string>
+    <string name="toast_saved">已保存，参数立即生效</string>
+    <string name="toast_reset">已恢复默认参数（尚未保存）</string>
+
+    <!-- 主界面 -->
+    <string name="title_main">自动上滑助手</string>
+    <string name="subtitle_main">悬浮球控制 · 按周期在屏幕中部执行一次上滑，不模拟点击</string>
+    <string name="group_permission">权限准备</string>
+    <string name="group_control">运行控制</string>
+    <string name="row_overlay">悬浮窗权限</string>
+    <string name="row_accessibility">无障碍服务</string>
+    <string name="row_battery">电池优化白名单</string>
+    <string name="btn_grant">去开启</string>
+    <string name="btn_autostart">自启动 / 后台白名单</string>
+    <string name="btn_start_ball">启动悬浮球</string>
+    <string name="btn_stop_ball">停止悬浮球</string>
+    <string name="btn_settings">参数设置</string>
+    <string name="label_note">使用说明</string>
+    <string name="note_text">1. 依次开启上方三项权限；iQOO / vivo（OriginOS）请额外进入「自启动 / 后台高耗电」白名单，避免服务被清理。\n2. 点击「启动悬浮球」，悬浮球默认出现在屏幕右侧偏上位置，可长按拖动。\n3. 单击悬浮球开始运行（绿色，显示倒计时环）；再次单击暂停（琥珀色）。\n4. 双击悬浮球退出；也可在通知栏点「退出」。\n5. 无障碍被关闭或悬浮窗权限被回收时，悬浮球变红并提示原因，处理后单击悬浮球即可恢复。\n6. 本插件仅注入上滑手势，不读取屏幕内容、不模拟点击、不依赖 Root。</string>
+
+    <!-- 设置页 -->
+    <string name="title_settings">参数设置</string>
+    <string name="label_interval">上滑间隔</string>
+    <string name="label_duration">滑动时长</string>
+    <string name="label_distance">滑动距离（占安全区高度）</string>
+    <string name="label_ring">在悬浮球上显示倒计时环</string>
+    <string name="label_preview">滑动位置预览</string>
+    <string name="btn_save">保存并立即生效</string>
+    <string name="btn_reset">恢复默认</string>
+    <string name="note_effect">生效规则：间隔修改后立即从「当前时间 + 新间隔」重新计时；距离与时长在「下一次上滑」时生效；未点击保存则不会写入配置。</string>
+    <string name="note_range">取值范围：间隔 5–120 秒 · 时长 100–1000 ms · 距离 15%–60%</string>
+
+    <string name="fmt_row">%1$s：%2$s</string>
+    <string name="fmt_state">当前状态：%1$s</string>
+    <string name="fmt_config">每 %1$d 秒上滑一次 · 时长 %2$d ms · 距离 %3$d%%</string>
+    <string name="fmt_screen">当前机型：%1$d × %2$d（%3$d dpi）\n本次滑动：起点 Y=%4$d → 终点 Y=%5$d，位移 %6$d px，X 居中于 %7$d</string>
+    <string name="fmt_preview">本机实测：起点 (%1$d, %2$d) → 终点 (%3$d, %4$d)，滑动 %5$d px</string>
+    <string name="fmt_seconds">%1$d 秒</string>
+    <string name="fmt_millis">%1$d ms</string>
+    <string name="fmt_percent">%1$d%%</string>
+
+    <!-- 无障碍服务说明 -->
+    <string name="accessibility_desc">用于接收上滑手势注入通道</string>
+    <string name="accessibility_summary">仅执行屏幕中部上滑手势，不读取屏幕内容</string>
+</resources>

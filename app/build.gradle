@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.autoswipe.ball'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.autoswipe.ball"
+        minSdk 26
+        targetSdk 34
+        versionCode 3
+        versionName "1.0.2"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    buildFeatures {
+        buildConfig false
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+// 零第三方依赖：悬浮窗、无障碍手势、前台服务全部使用系统原生 API
+dependencies {
+}

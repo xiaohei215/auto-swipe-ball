@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  仅声明「可执行手势」，不声明 canRetrieveWindowContent：
+  插件绝不读取屏幕内容，从配置层面排除隐私越权可能。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canPerformGestures="true"
+    android:description="@string/accessibility_desc"
+    android:notificationTimeout="100"
+    android:summary="@string/accessibility_summary" />
