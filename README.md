@@ -81,12 +81,14 @@ v2 + v3 签名验证通过、zipalign 校验通过、dex 含全部 14 个业务�
 > **v1.0.2 变更**：修正悬浮球落位坐标（补 `FLAG_LAYOUT_IN_SCREEN`）。
 > 此前窗口原点被状态栏高度偏移，实测偏了 108px（球比预期低、且拖不到屏幕最顶端）。
 >
-> **v1.0.3 / v1.0.4 变更**：新增应用内检查更新（首页「版本更新」卡片 + 设置页可切换更新源）。
+> **v1.0.3 – v1.0.5 变更**：新增应用内检查更新（首页「版本更新」卡片 + 设置页可切换更新源）。
 > 应用为此新增了 `INTERNET` 权限 —— 这是它第一次具备联网能力，范围**仅限**访问你自己配置的
 > 更新源、读取版本信息与下载 APK；可以在设置里关掉自动检查，关掉后应用不会主动发起任何请求。
+> v1.0.5 起默认更新源指向 Gitee（国内可达性最好），并修正了仓库所有者 —— 必须填 Gitee 的
+> **个人空间地址**，填显示名会 404。
 > 详见上文[应用内更新](#应用内更新v104-起)。
 >
-> 1.0.0 → 1.0.4 均为同签名覆盖升级，直接装即可，不会丢配置，
+> 1.0.0 → 1.0.5 均为同签名覆盖升级，直接装即可，不会丢配置，
 > **ADB 授予的 `WRITE_SECURE_SETTINGS` 也会保留，无需重跑授权脚本**（真机实测确认）。
 
 > ### ✅ 已在真机上完整验证（2026-10-16，iQOO Neo9 Pro / Android 16）
@@ -247,9 +249,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ```json
 {
-  "versionCode": 7,
-  "versionName": "1.0.4",
-  "apkFileName": "AutoSwipeBall-1.0.4.apk",
+  "versionCode": 8,
+  "versionName": "1.0.5",
+  "apkFileName": "AutoSwipeBall-1.0.5.apk",
   "sizeBytes": 78000,
   "sha256": "…64 位十六进制…",
   "notes": "会显示在更新提示里"
@@ -259,13 +261,31 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 把元数据放在仓库文件而不是 GitHub Releases，是为了让「发布」退化成一次 `git push`：
 不需要 API token，也不必去网页上点几下。
 
+**本项目当前实际使用的地址**（排查时可直接访问验证）：
+
+```text
+元数据  https://gitee.com/xiaohei1234525/auto-swipe-ball/raw/main/dist/version.json
+APK     https://gitee.com/xiaohei1234525/auto-swipe-ball/raw/main/dist/AutoSwipeBall-<版本>.apk
+```
+
+> **Gitee 有三个实测踩到的特性**，换源或排查时值得知道：
+>
+> 1. **它有两个名字**：显示名与**个人空间地址**（URL 里用的那段）。两者可能完全不同
+>    （例如显示名 `xiaohei123`、空间地址 `xiaohei1234525`）。**URL 必须用空间地址**，
+>    用显示名会 404。填错会在任何时候都读不到版本信息。
+> 2. **raw 地址不支持 HEAD 请求** —— 用 `curl -I` 测会返回 404，但 `curl -L`（GET）正常。
+>    所以不要用 HEAD 来判断"地址是否可用"，会误判。
+> 3. **raw 会 302 重定向到 `raw.giteeusercontent.com`**（带签名参数的 CDN 地址），
+>    且 **CDN 有约 45 秒缓存**。含义有二：下载实现必须跟随 301/302/307/308
+>    （本项目的 `UpdateManager` 已处理）；刚发布完手机上不会立刻看到新版本，等半分钟即可。
+
 **下载安全**：元数据被视为不可信输入（必填字段缺失、版本号非整数、文件名含路径分隔符
 一律拒绝）；下载有字节上限；元数据提供 `sha256` 时下载后逐字节校验，不匹配即丢弃。
 
 **发布端**（维护者）：一条命令完成发版。
 
 ```bash
-KEYSTORE_PASS='<签名口令>' bash tools/release.sh 1.0.4 "这次改了什么"
+KEYSTORE_PASS='<签名口令>' bash tools/release.sh 1.0.5 "这次改了什么"
 # 改版本号(versionCode 自动 +1) → 构建 → 生成含 SHA-256 的 version.json
 # → 交叉校验 APK 内嵌版本号与元数据一致 → 提交推送
 ```
