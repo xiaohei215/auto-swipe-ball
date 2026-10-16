@@ -38,7 +38,7 @@ app/src/main/java/com/autoswipe/ball/
     └── PermissionUtils.java          # 权限检测与跳转（含厂商自启动页）
 
 verify/                               # 验证工程（不需要 Android SDK）
-├── CoreLogicTest.java                # 137 项核心逻辑断言
+├── CoreLogicTest.java                # 205 项核心逻辑断言
 ├── resource_audit.py                 # 静态资源一致性审计
 ├── run_verify.sh                     # 一键跑完三项验证
 ├── test_grant_script.sh              # 用「假 adb」回归测试授权脚本（无需真机）
@@ -81,7 +81,12 @@ v2 + v3 签名验证通过、zipalign 校验通过、dex 含全部 14 个业务�
 > **v1.0.2 变更**：修正悬浮球落位坐标（补 `FLAG_LAYOUT_IN_SCREEN`）。
 > 此前窗口原点被状态栏高度偏移，实测偏了 108px（球比预期低、且拖不到屏幕最顶端）。
 >
-> 1.0.0 → 1.0.1 → 1.0.2 均为同签名覆盖升级，直接装即可，不会丢配置，
+> **v1.0.3 / v1.0.4 变更**：新增应用内检查更新（首页「版本更新」卡片 + 设置页可切换更新源）。
+> 应用为此新增了 `INTERNET` 权限 —— 这是它第一次具备联网能力，范围**仅限**访问你自己配置的
+> 更新源、读取版本信息与下载 APK；可以在设置里关掉自动检查，关掉后应用不会主动发起任何请求。
+> 详见上文[应用内更新](#应用内更新v104-起)。
+>
+> 1.0.0 → 1.0.4 均为同签名覆盖升级，直接装即可，不会丢配置，
 > **ADB 授予的 `WRITE_SECURE_SETTINGS` 也会保留，无需重跑授权脚本**（真机实测确认）。
 
 > ### ✅ 已在真机上完整验证（2026-10-16，iQOO Neo9 Pro / Android 16）
@@ -242,7 +247,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ```json
 {
-  "versionCode": 6,
+  "versionCode": 7,
   "versionName": "1.0.4",
   "apkFileName": "AutoSwipeBall-1.0.4.apk",
   "sizeBytes": 78000,
@@ -332,7 +337,7 @@ bash verify/run_verify.sh
 
 ```
 [1/3] 核心纯逻辑单元测试（8 个纯 Java 类）
-      通过: 137  失败: 0       结果: ALL PASS
+      通过: 205  失败: 0       结果: ALL PASS
       覆盖：iQOO 基准机型坐标 / 5 种分辨率 × 3 档距离的边界不变量 /
             系统栏缺失回退 / 参数上下限收敛（含 0 与 NaN）/
             状态机 7 步迁移 / 故障语义 / 服务中断重启标记 / 事件总线 / 时长跟随
