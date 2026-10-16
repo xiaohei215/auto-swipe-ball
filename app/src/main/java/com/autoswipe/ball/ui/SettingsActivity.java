@@ -3,6 +3,9 @@ package com.autoswipe.ball.ui;
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -14,13 +17,19 @@ import com.autoswipe.ball.core.ScreenMetrics;
 import com.autoswipe.ball.core.SwipeConfig;
 import com.autoswipe.ball.core.SwipeGeometry;
 import com.autoswipe.ball.core.SwipeMotion;
+import com.autoswipe.ball.core.UpdateInfo;
+import com.autoswipe.ball.core.UpdateSource;
 import com.autoswipe.ball.service.FloatingBallService;
+import com.autoswipe.ball.service.UpdateManager;
 
 /**
  * 参数设置页。
  *
  * <p>三个参数都用 SeekBar 承载，拖动即时预览，点「保存并立即生效」后写盘并通知服务重载：
  * 间隔变更会重置下一次计时，距离与时长在「下一次上滑」时生效。</p>
+ *
+ * <p>另外承载「更新源」的选择：更新源做成可切换而非写死，是为了让换源不必重新发版
+ * —— 而「不必重新发版」正是检查更新这个功能本身想解决的问题。</p>
  */
 public class SettingsActivity extends Activity {
 
@@ -42,6 +51,14 @@ public class SettingsActivity extends Activity {
     private SwipeConfig pending;
     /** 屏幕参数只在进入页面时读一次，拖动时不再反复查询系统 */
     private ScreenMetrics metrics;
+
+    private RadioGroup rgUpdateSource;
+    private RadioButton rbSourceGitee;
+    private RadioButton rbSourceGithub;
+    private RadioButton rbSourceCustom;
+    private EditText etUpdateCustom;
+    private CheckBox cbUpdateWifiOnly;
+    private TextView tvUpdateSourceDesc;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +132,101 @@ public class SettingsActivity extends Activity {
 
         pushToSeekBars();
         render();
+        bindUpdateSource();
+    }
+
+    // ------------------------------------------------------------------
+    // 更新源
+
+    private void bindUpdateSource() {
+        rgUpdateSource = findViewById(R.id.rg_update_source);
+        rbSourceGitee = findViewById(R.id.rb_source_gitee);
+        rbSourceGithub = findViewById(R.id.rb_source_github);
+        rbSourceCustom = findViewById(R.id.rb_source_custom);
+        etUpdateCustom = findViewById(R.id.et_update_custom);
+        cbUpdateWifiOnly = findViewById(R.id.cb_update_wifi_only);
+        tvUpdateSourceDesc = findViewById(R.id.tv_update_source_desc);
+
+        UpdateSource current = PrefsStore.loadUpdateSource(this);
+        switch (current.kind) {
+            case GITHUB:
+                rbSourceGithub.setChecked(true);
+                break;
+            case CUSTOM:
+                rbSourceCustom.setChecked(true);
+                break;
+            case GITEE:
+            default:
+                rbSourceGitee.setChecked(true);
+                break;
+        }
+        etUpdateCustom.setText(current.customBaseUrl);
+        cbUpdateWifiOnly.setChecked(PrefsStore.isUpdateWifiOnly(this));
+
+        rgUpdateSource.setOnCheckedChangeListener((group, checkedId) -> renderUpdateSource());
+        cbUpdateWifiOnly.setOnCheckedChangeListener((buttonView, checked) ->
+                PrefsStore.setUpdateWifiOnly(this, checked));
+        findViewById(R.id.btn_save_source).setOnClickListener(v -> saveUpdateSource());
+
+        renderUpdateSource();
+    }
+
+    private void renderUpdateSource() {
+        etUpdateCustom.setEnabled(rbSourceCustom.isChecked());
+        tvUpdateSourceDesc.setText(getString(R.string.fmt_update_source,
+                sourceFromUi().describe()));
+    }
+
+    /**
+     * 取界面上的选择。
+     *
+     * <p>owner / repo / branch 沿用已保存的值，避免在只切换平台时把仓库信息重置成默认。</p>
+     */
+    private UpdateSource sourceFromUi() {
+        UpdateSource saved = PrefsStore.loadUpdateSource(this);
+        if (rbSourceGithub.isChecked()) {
+            return UpdateSource.github(saved.owner, saved.repo, saved.branch);
+        }
+        if (rbSourceCustom.isChecked()) {
+            return UpdateSource.custom(etUpdateCustom.getText().toString());
+        }
+        return UpdateSource.gitee(saved.owner, saved.repo, saved.branch);
+    }
+
+    private void saveUpdateSource() {
+        UpdateSource source = sourceFromUi();
+        if (!source.isConfigured()) {
+            Toast.makeText(this, R.string.toast_source_invalid, Toast.LENGTH_LONG).show();
+            return;
+        }
+        PrefsStore.saveUpdateSource(this, source);
+        PrefsStore.setUpdateWifiOnly(this, cbUpdateWifiOnly.isChecked());
+        Toast.makeText(this, R.string.toast_source_saved, Toast.LENGTH_SHORT).show();
+        renderUpdateSource();
+        // 顺手验一次，让用户当场知道这个源到底通不通
+        testSource(source);
+    }
+
+    private void testSource(UpdateSource source) {
+        tvUpdateSourceDesc.setText(R.string.update_source_checking);
+        UpdateManager.checkAsync(this, source, UpdateManager.localVersionCode(this),
+                new UpdateManager.CheckCallback() {
+                    @Override
+                    public void onResult(UpdateInfo info) {
+                        if (info == null) {
+                            tvUpdateSourceDesc.setText(getString(R.string.fmt_update_source_same,
+                                    UpdateManager.localVersionName(SettingsActivity.this)));
+                        } else {
+                            tvUpdateSourceDesc.setText(getString(R.string.fmt_update_source_ok,
+                                    info.versionName));
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        tvUpdateSourceDesc.setText(getString(R.string.fmt_update_failed, message));
+                    }
+                });
     }
 
     private interface OnValueChanged {

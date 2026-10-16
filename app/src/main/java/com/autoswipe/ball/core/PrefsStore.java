@@ -18,6 +18,13 @@ public final class PrefsStore {
     private static final String K_AUTO_HEAL = "auto_heal_accessibility";
     private static final String K_LAST_STATE = "last_state";
     private static final String K_LAST_REASON = "last_reason";
+    private static final String K_UPDATE_KIND = "update_source_kind";
+    private static final String K_UPDATE_OWNER = "update_source_owner";
+    private static final String K_UPDATE_REPO = "update_source_repo";
+    private static final String K_UPDATE_BRANCH = "update_source_branch";
+    private static final String K_UPDATE_CUSTOM = "update_source_custom";
+    private static final String K_UPDATE_WIFI_ONLY = "update_wifi_only";
+    private static final String K_UPDATE_CHECKED_AT = "update_checked_at";
 
     private PrefsStore() {
     }
@@ -70,5 +77,62 @@ public final class PrefsStore {
     public static String loadRuntimeReason(Context ctx) {
         String r = sp(ctx).getString(K_LAST_REASON, "");
         return r == null ? "" : r;
+    }
+
+    // ------------------------------------------------------------------
+    // 更新源
+
+    /**
+     * 读取更新源配置；从未配置过时返回默认的 Gitee 源。
+     *
+     * <p>之所以做成「可切换」而不是写死：不同网络环境下 Gitee 与 GitHub 的可达性会变，
+     * 写死意味着换源必须重新发版，而那正是本功能想解决的痛点。</p>
+     */
+    public static UpdateSource loadUpdateSource(Context ctx) {
+        SharedPreferences p = sp(ctx);
+        UpdateSource.Kind kind = UpdateSource.Kind.fromName(p.getString(K_UPDATE_KIND, null));
+        String owner = p.getString(K_UPDATE_OWNER, UpdateSource.DEFAULT_OWNER);
+        String repo = p.getString(K_UPDATE_REPO, UpdateSource.DEFAULT_REPO);
+        String branch = p.getString(K_UPDATE_BRANCH, UpdateSource.DEFAULT_BRANCH);
+        String custom = p.getString(K_UPDATE_CUSTOM, "");
+        switch (kind) {
+            case GITHUB:
+                return UpdateSource.github(owner, repo, branch);
+            case CUSTOM:
+                return UpdateSource.custom(custom == null ? "" : custom);
+            case GITEE:
+            default:
+                return UpdateSource.gitee(owner, repo, branch);
+        }
+    }
+
+    /** 保存更新源配置。 */
+    public static void saveUpdateSource(Context ctx, UpdateSource source) {
+        UpdateSource s = source == null ? UpdateSource.defaultGitee() : source;
+        sp(ctx).edit()
+                .putString(K_UPDATE_KIND, s.kind.name())
+                .putString(K_UPDATE_OWNER, s.owner)
+                .putString(K_UPDATE_REPO, s.repo)
+                .putString(K_UPDATE_BRANCH, s.branch)
+                .putString(K_UPDATE_CUSTOM, s.customBaseUrl)
+                .apply();
+    }
+
+    /** 是否只在 Wi-Fi 下自动检查更新（默认开启，避免消耗移动流量）。 */
+    public static boolean isUpdateWifiOnly(Context ctx) {
+        return sp(ctx).getBoolean(K_UPDATE_WIFI_ONLY, true);
+    }
+
+    public static void setUpdateWifiOnly(Context ctx, boolean value) {
+        sp(ctx).edit().putBoolean(K_UPDATE_WIFI_ONLY, value).apply();
+    }
+
+    /** 上次检查更新的时间戳（毫秒）；0 表示从未检查过。 */
+    public static long lastUpdateCheckAt(Context ctx) {
+        return sp(ctx).getLong(K_UPDATE_CHECKED_AT, 0L);
+    }
+
+    public static void markUpdateChecked(Context ctx) {
+        sp(ctx).edit().putLong(K_UPDATE_CHECKED_AT, System.currentTimeMillis()).apply();
     }
 }

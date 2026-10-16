@@ -84,4 +84,38 @@
     <!-- 无障碍服务说明 -->
     <string name="accessibility_desc">用于接收上滑手势注入通道</string>
     <string name="accessibility_summary">仅执行屏幕中部上滑手势，不读取屏幕内容</string>
+
+    <!-- 版本更新 -->
+    <string name="update_group_title">版本更新</string>
+    <string name="fmt_update_current">当前版本 %1$s（versionCode %2$d）</string>
+    <string name="btn_check_update">检查更新</string>
+    <string name="btn_checking_update">正在检查…</string>
+    <string name="update_up_to_date">已是最新版本</string>
+    <string name="fmt_update_found">发现新版本 %1$s（当前 %2$s）</string>
+    <string name="update_notes_label">更新内容</string>
+    <string name="btn_download_install">下载并安装</string>
+    <string name="fmt_update_downloading">正在下载 %1$d%%</string>
+    <string name="update_installed">更新已安装</string>
+    <string name="fmt_update_install_failed">安装未完成：%1$s</string>
+    <string name="update_confirm_missing">系统没有返回安装确认界面，请重试</string>
+    <string name="update_confirm_failed">无法打开安装界面，请确认已允许本应用「安装未知应用」</string>
+    <string name="update_need_install_permission">需要先允许「安装未知应用」，已为你打开设置</string>
+    <string name="fmt_update_failed">更新失败：%1$s</string>
+    <string name="fmt_update_source">更新源：%1$s</string>
+    <string name="update_source_checking">正在测试更新源…</string>
+    <string name="fmt_update_source_ok">更新源可用：远端版本 %1$s</string>
+    <string name="fmt_update_source_same">更新源可用，远端版本与本地相同（%1$s）</string>
+
+    <!-- 设置页 · 更新源 -->
+    <string name="label_update_source">更新源</string>
+    <string name="update_source_gitee">Gitee（国内可达，推荐）</string>
+    <string name="update_source_github">GitHub（raw 域名在国内常不可达）</string>
+    <string name="update_source_custom">自定义地址</string>
+    <string name="label_update_wifi_only">仅在 Wi-Fi 下自动检查更新</string>
+    <string name="hint_update_custom">http://192.168.1.5:8000</string>
+    <string name="note_update_source">检查更新会访问所选地址读取版本信息，不发送任何使用数据。\n换源不需要重新安装：若某个源在当前网络下不通，换一个即可。\n自定义源需指向一个存放 version.json 与 APK 的目录地址。</string>
+    <string name="toast_source_saved">更新源已保存</string>
+    <string name="toast_source_invalid">地址不合法：需以 http:// 或 https:// 开头</string>
+    <string name="btn_save_source">保存更新源</string>
+    <string name="update_wifi_only_hint">关闭后允许在移动数据下自动检查（每次只读取几百字节的版本信息）</string>
 </resources>

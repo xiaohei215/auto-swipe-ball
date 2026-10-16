@@ -20,6 +20,20 @@
     -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
+    <!--
+      应用内检查更新（v1.0.3 起新增）：
+      仅用于访问更新源读取 version.json 与下载 APK，不做任何数据上报。
+      不使用该功能时不会有任何网络请求。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 仅用于判断当前是否在 Wi-Fi，以便「仅 Wi-Fi 下检查更新」这一偏好生效 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+      安装下载好的新版本：非系统应用无法静默安装，
+      提交会话后仍需用户在系统界面点一次「安装」确认。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".App"
         android:allowBackup="false"
@@ -66,5 +80,10 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- 接收系统安装器的会话回执，用拉起「确认安装」界面 -->
+        <receiver
+            android:name=".service.InstallResultReceiver"
+            android:exported="false" />
     </application>
 </manifest>

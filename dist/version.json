@@ -1,0 +1,8 @@
+{
+  "versionCode": 5,
+  "versionName": "1.0.3",
+  "apkFileName": "AutoSwipeBall-1.0.3.apk",
+  "sizeBytes": 74731,
+  "sha256": "9f6c11e5d1abae2b73a168045904f54807126a9e5629ac59f62ed469f66cace8",
+  "notes": "新增应用内检查更新：首页可直接检查并下载新版本（支持 Gitee / GitHub / 自定义源切换，安装时系统会请你确认一次）"
+}

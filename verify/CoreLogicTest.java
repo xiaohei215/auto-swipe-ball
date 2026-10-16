@@ -1,3 +1,4 @@
+import com.autoswipe.ball.core.LiteJson;
 import com.autoswipe.ball.core.RunState;
 import com.autoswipe.ball.core.SafeArea;
 import com.autoswipe.ball.core.ScreenMetrics;
@@ -6,16 +7,24 @@ import com.autoswipe.ball.core.StateMachine;
 import com.autoswipe.ball.core.SwipeConfig;
 import com.autoswipe.ball.core.SwipeGeometry;
 import com.autoswipe.ball.core.SwipeMotion;
+import com.autoswipe.ball.core.UpdateInfo;
+import com.autoswipe.ball.core.UpdateSource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * core 层纯逻辑验证（不依赖 Android SDK，可直接 javac + java 运行）。
  *
- * <p>覆盖：坐标计算 / 安全区回退 / 参数收敛 / 四种状态迁移 / 异常停止恢复。</p>
+ * <p>覆盖：坐标计算 / 安全区回退 / 参数收敛 / 四种状态迁移 / 异常停止恢复 /
+ * 更新元数据解析与更新源 URL 构造。</p>
  */
 public class CoreLogicTest {
+
+    /** 格式合法的 SHA-256 样本（具体内容不重要，只用于验证解析与比较） */
+    private static final String SHA_OK =
+            "bd1cb2cb4ef2ea51ecffd0c99ff807ef153224d514214dc8e397c6574974e4b7";
 
     private static int passed = 0;
     private static final List<String> failures = new ArrayList<String>();
@@ -29,6 +38,10 @@ public class CoreLogicTest {
         testStateMachineFaultSemantics();
         testStateHubPublish();
         testMotionDurationFollowsConfig();
+        testLiteJsonParsing();
+        testUpdateInfoValidation();
+        testUpdateSourceUrls();
+        testUpdateRoundTrip();
 
         System.out.println("==================================================");
         System.out.println("通过: " + passed + "  失败: " + failures.size());
@@ -304,6 +317,203 @@ public class CoreLogicTest {
                 return "无障碍服务未开启";
             }
             return null;
+        }
+    }
+
+    // ---------- 9. 更新元数据的 JSON 解析 ----------
+
+    private static void testLiteJsonParsing() {
+        Map<String, Object> m = LiteJson.parseObject(
+                "{\"versionCode\": 3, \"versionName\": \"1.0.2\", \"ok\": true, \"none\": null}");
+        check("JSON: 整数解析", m.get("versionCode") instanceof Double
+                && ((Double) m.get("versionCode")) == 3.0);
+        check("JSON: 字符串解析", "1.0.2".equals(m.get("versionName")));
+        check("JSON: 布尔解析", Boolean.TRUE.equals(m.get("ok")));
+        check("JSON: null 解析", m.containsKey("none") && m.get("none") == null);
+
+        Map<String, Object> esc = LiteJson.parseObject("{\"a\":\"x\\ny\",\"b\":\"\\u4e2d\\u6587\"}");
+        check("JSON: 转义换行", "x\ny".equals(esc.get("a")));
+        check("JSON: unicode 转义", "中文".equals(esc.get("b")));
+
+        Map<String, Object> bom = LiteJson.parseObject("\uFEFF{\"a\":\"b\"}");
+        check("JSON: 容忍 BOM", "b".equals(bom.get("a")));
+
+        Map<String, Object> nested = LiteJson.parseObject("{\"outer\":{\"inner\":7}}");
+        Object inner = nested.get("outer");
+        check("JSON: 嵌套对象", inner instanceof Map
+                && ((Double) ((Map<?, ?>) inner).get("inner")) == 7.0);
+
+        Map<String, Object> spaced = LiteJson.parseObject("  {  \"a\" : \"b\" , \"c\" : 1 }  ");
+        check("JSON: 容忍空白", "b".equals(spaced.get("a")) && spaced.size() == 2);
+
+        check("JSON: 空对象", LiteJson.parseObject("{}").isEmpty());
+
+        check("JSON: 空输入报错", throwsIae(() -> LiteJson.parseObject("")));
+        check("JSON: null 输入报错", throwsIae(() -> LiteJson.parseObject(null)));
+        check("JSON: 未闭合报错", throwsIae(() -> LiteJson.parseObject("{\"a\":\"b\"")));
+        check("JSON: 尾随内容报错", throwsIae(() -> LiteJson.parseObject("{\"a\":1} x")));
+        check("JSON: 数组报错", throwsIae(() -> LiteJson.parseObject("{\"a\":[1]}")));
+        check("JSON: 缺冒号报错", throwsIae(() -> LiteJson.parseObject("{\"a\" 1}")));
+        check("JSON: 非法数值报错", throwsIae(() -> LiteJson.parseObject("{\"a\":.}")));
+    }
+
+    // ---------- 10. 版本元数据的字段校验 ----------
+
+    private static void testUpdateInfoValidation() {
+        String full = "{\"versionCode\":4,\"versionName\":\"1.0.3\","
+                + "\"apkFileName\":\"AutoSwipeBall-1.0.3.apk\",\"sizeBytes\":56120,"
+                + "\"sha256\":\"" + SHA_OK + "\",\"notes\":\"新增应用内检查更新\"}";
+        UpdateInfo info = UpdateInfo.fromJson(full);
+        check("UpdateInfo: versionCode", info.versionCode == 4);
+        check("UpdateInfo: versionName", "1.0.3".equals(info.versionName));
+        check("UpdateInfo: apkFileName", "AutoSwipeBall-1.0.3.apk".equals(info.apkFileName));
+        check("UpdateInfo: sizeBytes", info.sizeBytes == 56120L);
+        check("UpdateInfo: sha256 归一为小写", SHA_OK.toLowerCase().equals(info.sha256));
+        check("UpdateInfo: hasSha256", info.hasSha256());
+        check("UpdateInfo: notes", "新增应用内检查更新".equals(info.notes));
+
+        check("版本比较: 更旧算有更新", info.isNewerThan(3));
+        check("版本比较: 相同不算", !info.isNewerThan(4));
+        check("版本比较: 本地更新时不打扰", !info.isNewerThan(5));
+
+        check("UpdateInfo: 缺 versionCode 报错", throwsIae(() ->
+                UpdateInfo.fromJson("{\"versionName\":\"1\",\"apkFileName\":\"a.apk\"}")));
+        check("UpdateInfo: versionCode 为字符串报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":\"4\",\"versionName\":\"1\",\"apkFileName\":\"a.apk\"}")));
+        check("UpdateInfo: versionCode 为 0 报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":0,\"versionName\":\"1\",\"apkFileName\":\"a.apk\"}")));
+        check("UpdateInfo: versionCode 为小数报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":1.5,\"versionName\":\"1\",\"apkFileName\":\"a.apk\"}")));
+        check("UpdateInfo: 缺 apkFileName 报错", throwsIae(() ->
+                UpdateInfo.fromJson("{\"versionCode\":4,\"versionName\":\"1\"}")));
+        check("UpdateInfo: versionName 全空白报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":4,\"versionName\":\"  \",\"apkFileName\":\"a.apk\"}")));
+        check("UpdateInfo: 空对象报错", throwsIae(() -> UpdateInfo.fromJson("{}")));
+
+        check("UpdateInfo: 文件名目录穿越报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"../a.apk\"}")));
+        check("UpdateInfo: 文件名含反斜杠报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"d\\\\a.apk\"}")));
+        check("UpdateInfo: 非 apk 后缀报错", throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"a.txt\"}")));
+        check("UpdateInfo: 大写后缀允许", !throwsIae(() ->
+                UpdateInfo.fromJson(
+                        "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"A.APK\"}")));
+
+        UpdateInfo minimal = UpdateInfo.fromJson(
+                "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"a.apk\"}");
+        check("UpdateInfo: sizeBytes 缺省为 0", minimal.sizeBytes == 0L);
+        check("UpdateInfo: sha256 缺省视为未提供", !minimal.hasSha256());
+        check("UpdateInfo: notes 缺省为空", minimal.notes.isEmpty());
+
+        UpdateInfo badSha = UpdateInfo.fromJson(
+                "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"a.apk\",\"sha256\":\"xyz\"}");
+        check("UpdateInfo: sha256 格式非法视为未提供（不阻断更新）", !badSha.hasSha256());
+
+        UpdateInfo negSize = UpdateInfo.fromJson(
+                "{\"versionCode\":4,\"versionName\":\"1\",\"apkFileName\":\"a.apk\",\"sizeBytes\":-1}");
+        check("UpdateInfo: sizeBytes 负数归零", negSize.sizeBytes == 0L &&
+                UpdateInfo.fromJson("{\"versionCode\":4,\"versionName\":\"1\","
+                        + "\"apkFileName\":\"a.apk\",\"sizeBytes\":-1}").sizeBytes == 0L);
+    }
+
+    // ---------- 11. 更新源 URL 构造 ----------
+
+    private static void testUpdateSourceUrls() {
+        UpdateSource gitee = UpdateSource.gitee("xiaohei215", "auto-swipe-ball", "main");
+        check("源: Gitee 元数据 URL",
+                "https://gitee.com/xiaohei215/auto-swipe-ball/raw/main/dist/version.json"
+                        .equals(gitee.metaUrl()));
+        check("源: Gitee APK URL",
+                "https://gitee.com/xiaohei215/auto-swipe-ball/raw/main/dist/AutoSwipeBall-1.0.3.apk"
+                        .equals(gitee.apkUrl("AutoSwipeBall-1.0.3.apk")));
+        check("源: Gitee 只带 User-Agent", gitee.requestHeaders().size() == 1);
+        check("源: Gitee 配置完整", gitee.isConfigured());
+
+        UpdateSource github = UpdateSource.github("xiaohei215", "auto-swipe-ball", "main");
+        check("源: GitHub 走 api 域名（raw 域名在国内常不可达）",
+                github.metaUrl().startsWith("https://api.github.com/repos/"));
+        check("源: GitHub 带 ref 参数", github.metaUrl().endsWith("?ref=main"));
+        check("源: GitHub 要求 raw Accept",
+                "application/vnd.github.raw".equals(github.requestHeaders().get("Accept")));
+        check("源: GitHub 带 User-Agent", github.requestHeaders().containsKey("User-Agent"));
+
+        UpdateSource custom = UpdateSource.custom("http://192.168.1.5:8000/");
+        check("源: 自定义去掉尾部斜杠",
+                "http://192.168.1.5:8000/version.json".equals(custom.metaUrl()));
+        check("源: 自定义 APK URL",
+                "http://192.168.1.5:8000/AutoSwipeBall-1.0.3.apk"
+                        .equals(custom.apkUrl("AutoSwipeBall-1.0.3.apk")));
+        check("源: 自定义空地址不完整", !UpdateSource.custom("").isConfigured());
+        check("源: 自定义非 http 开头不完整", !UpdateSource.custom("ftp://x/y").isConfigured());
+
+        check("源: apkUrl 拒绝路径穿越", throwsIae(() -> gitee.apkUrl("../evil.apk")));
+
+        UpdateSource fallback = UpdateSource.gitee(null, "  ", "");
+        check("源: 空字段回退默认值", UpdateSource.DEFAULT_OWNER.equals(fallback.owner)
+                && UpdateSource.DEFAULT_REPO.equals(fallback.repo)
+                && UpdateSource.DEFAULT_BRANCH.equals(fallback.branch));
+
+        check("源: fromName 空值默认 Gitee",
+                UpdateSource.Kind.GITEE == UpdateSource.Kind.fromName(null));
+        check("源: fromName 忽略大小写",
+                UpdateSource.Kind.GITHUB == UpdateSource.Kind.fromName("github"));
+        check("源: fromName 未知值回退 Gitee",
+                UpdateSource.Kind.GITEE == UpdateSource.Kind.fromName("nope"));
+
+        check("源: sameAs 识别相同配置", gitee.sameAs(
+                UpdateSource.gitee("xiaohei215", "auto-swipe-ball", "main")));
+        check("源: sameAs 识别不同配置", !gitee.sameAs(github));
+        check("源: sameAs 对 null 为假", !gitee.sameAs(null));
+    }
+
+    // ---------- 12. 端到端衔接：元数据 -> 下载地址 ----------
+
+    private static void testUpdateRoundTrip() {
+        // 模拟 tools/release.sh 生成的 dist/version.json
+        String json = "{\n"
+                + "  \"versionCode\": 4,\n"
+                + "  \"versionName\": \"1.0.3\",\n"
+                + "  \"apkFileName\": \"AutoSwipeBall-1.0.3.apk\",\n"
+                + "  \"sizeBytes\": 61234,\n"
+                + "  \"sha256\": \"" + SHA_OK + "\",\n"
+                + "  \"notes\": \"新增应用内检查更新\\n支持 Gitee / GitHub / 自定义源\"\n"
+                + "}";
+        UpdateInfo info = UpdateInfo.fromJson(json);
+        UpdateSource source = UpdateSource.defaultGitee();
+
+        check("闭环: 默认源指向本项目的仓库", source.describe().contains("auto-swipe-ball"));
+        check("闭环: 多行说明里的换行被保留", info.notes.contains("\n"));
+        check("闭环: 元数据文件名能拼出下载地址",
+                source.apkUrl(info.apkFileName).endsWith("/dist/" + info.apkFileName));
+        check("闭环: 能识别出有新版", info.isNewerThan(3));
+        check("闭环: 换成 GitHub 源同样能拼出地址",
+                UpdateSource.github("xiaohei215", "auto-swipe-ball", "main")
+                        .apkUrl(info.apkFileName).contains("/contents/dist/"));
+    }
+
+    // ------------------------------------------------------------------
+
+    private interface ThrowingAction {
+        void run();
+    }
+
+    /** 断言一段代码抛出了 IllegalArgumentException（即「被正确拒绝」）。 */
+    private static boolean throwsIae(ThrowingAction action) {
+        try {
+            action.run();
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 

@@ -3,10 +3,12 @@ package com.autoswipe.ball.ui;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -22,11 +24,16 @@ import com.autoswipe.ball.core.StateHub;
 import com.autoswipe.ball.core.SwipeConfig;
 import com.autoswipe.ball.core.SwipeGeometry;
 import com.autoswipe.ball.core.SwipeMotion;
+import com.autoswipe.ball.core.UpdateInfo;
+import com.autoswipe.ball.core.UpdateSource;
 import com.autoswipe.ball.service.AccessibilityHealer;
 import com.autoswipe.ball.service.FloatingBallService;
+import com.autoswipe.ball.service.UpdateManager;
+
+import java.io.File;
 
 /**
- * 主界面：权限引导 + 运行状态回显 + 悬浮球控制入口 + 无障碍修复。
+ * 主界面：权限引导 + 运行状态回显 + 悬浮球控制入口 + 无障碍修复 + 检查更新。
  *
  * <p>状态展示不自行轮询，而是订阅 {@link StateHub}，与服务端保持单一数据源。</p>
  */
@@ -35,6 +42,8 @@ public class MainActivity extends Activity implements StateHub.Observer {
     private static final int REQ_NOTIFICATION = 1001;
     /** 自动恢复后等待系统重新绑定无障碍服务的复查延迟（ms） */
     private static final long[] RECHECK_DELAYS = {600L, 1500L, 3000L};
+    /** 自动检查更新的最小间隔：6 小时。手动点按钮不受此限制。 */
+    private static final long AUTO_CHECK_INTERVAL_MS = 6L * 60 * 60 * 1000;
 
     private TextView tvState;
     private TextView tvReason;
@@ -48,6 +57,15 @@ public class MainActivity extends Activity implements StateHub.Observer {
     private TextView tvFixDesc;
     private TextView tvAdbStatus;
     private Button btnAutoHeal;
+
+    private TextView tvUpdateCurrent;
+    private TextView tvUpdateStatus;
+    private TextView tvUpdateNotes;
+    private Button btnCheckUpdate;
+    /** 已发现的远端新版本；为 null 表示当前没有待安装的更新 */
+    private UpdateInfo pendingUpdate;
+    /** 正在检查或下载，期间的重复点击直接忽略 */
+    private boolean updateBusy;
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private int recheckIndex;
@@ -96,6 +114,12 @@ public class MainActivity extends Activity implements StateHub.Observer {
         findViewById(R.id.btn_app_info).setOnClickListener(
                 v -> AccessibilityHealer.openAppDetails(this));
 
+        tvUpdateCurrent = findViewById(R.id.tv_update_current);
+        tvUpdateStatus = findViewById(R.id.tv_update_status);
+        tvUpdateNotes = findViewById(R.id.tv_update_notes);
+        btnCheckUpdate = findViewById(R.id.btn_check_update);
+        btnCheckUpdate.setOnClickListener(v -> onUpdateButtonClicked());
+
         requestNotificationPermissionIfNeeded();
     }
 
@@ -107,6 +131,8 @@ public class MainActivity extends Activity implements StateHub.Observer {
             hub.addObserver(this);
         }
         refreshStaticInfo();
+        refreshUpdateSection();
+        maybeAutoCheckUpdate();
     }
 
     @Override
@@ -240,6 +266,166 @@ public class MainActivity extends Activity implements StateHub.Observer {
         FloatingBallService.launch(this);
         Toast.makeText(this, R.string.toast_ball_launched, Toast.LENGTH_LONG).show();
         btnBall.setText(R.string.btn_stop_ball);
+    }
+
+    // ------------------------------------------------------------------
+    // 版本更新
+
+    private void refreshUpdateSection() {
+        tvUpdateCurrent.setText(getString(R.string.fmt_update_current,
+                UpdateManager.localVersionName(this), UpdateManager.localVersionCode(this)));
+    }
+
+    /**
+     * 自动检查更新。
+     *
+     * <p>受两道约束：距上次检查不足 6 小时不重复查；开启了「仅 Wi-Fi」且当前不在 Wi-Fi 上时跳过。
+     * 自动检查失败保持安静——绝大多数情况只是当前网络到不了更新源，弹错反而干扰。</p>
+     */
+    private void maybeAutoCheckUpdate() {
+        if (updateBusy || pendingUpdate != null) {
+            return;
+        }
+        long elapsed = System.currentTimeMillis() - PrefsStore.lastUpdateCheckAt(this);
+        if (elapsed < AUTO_CHECK_INTERVAL_MS) {
+            return;
+        }
+        if (PrefsStore.isUpdateWifiOnly(this) && !UpdateManager.isOnWifi(this)) {
+            return;
+        }
+        startCheck(false);
+    }
+
+    private void onUpdateButtonClicked() {
+        if (updateBusy) {
+            return;
+        }
+        if (pendingUpdate != null) {
+            startDownload();
+        } else {
+            startCheck(true);
+        }
+    }
+
+    private void startCheck(final boolean manual) {
+        updateBusy = true;
+        btnCheckUpdate.setEnabled(false);
+        btnCheckUpdate.setText(R.string.btn_checking_update);
+        if (manual) {
+            setUpdateStatus(getString(R.string.btn_checking_update), R.color.text_secondary);
+        }
+        UpdateSource source = PrefsStore.loadUpdateSource(this);
+        UpdateManager.checkAsync(this, source, UpdateManager.localVersionCode(this),
+                new UpdateManager.CheckCallback() {
+                    @Override
+                    public void onResult(UpdateInfo info) {
+                        updateBusy = false;
+                        btnCheckUpdate.setEnabled(true);
+                        PrefsStore.markUpdateChecked(MainActivity.this);
+                        if (info == null) {
+                            pendingUpdate = null;
+                            btnCheckUpdate.setText(R.string.btn_check_update);
+                            showUpdateNotes(null);
+                            setUpdateStatus(getString(R.string.update_up_to_date), R.color.state_ok);
+                        } else {
+                            pendingUpdate = info;
+                            btnCheckUpdate.setText(R.string.btn_download_install);
+                            setUpdateStatus(getString(R.string.fmt_update_found,
+                                            info.versionName,
+                                            UpdateManager.localVersionName(MainActivity.this)),
+                                    R.color.brand);
+                            showUpdateNotes(info.notes);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        updateBusy = false;
+                        btnCheckUpdate.setEnabled(true);
+                        btnCheckUpdate.setText(R.string.btn_check_update);
+                        if (manual) {
+                            setUpdateStatus(getString(R.string.fmt_update_failed, message),
+                                    R.color.state_bad);
+                        }
+                    }
+                });
+    }
+
+    private void startDownload() {
+        final UpdateInfo info = pendingUpdate;
+        if (info == null) {
+            return;
+        }
+        // 没有「安装未知应用」权限时系统会在提交会话后直接拒绝，不如提前引导
+        if (!UpdateManager.canRequestInstall(this)) {
+            Toast.makeText(this, R.string.update_need_install_permission, Toast.LENGTH_LONG).show();
+            openInstallPermissionSettings();
+            return;
+        }
+        updateBusy = true;
+        btnCheckUpdate.setEnabled(false);
+        btnCheckUpdate.setText(getString(R.string.fmt_update_downloading, 0));
+        UpdateSource source = PrefsStore.loadUpdateSource(this);
+        UpdateManager.downloadAsync(this, source, info, new UpdateManager.DownloadCallback() {
+            @Override
+            public void onProgress(int percent) {
+                btnCheckUpdate.setText(percent >= 0
+                        ? getString(R.string.fmt_update_downloading, percent)
+                        : getString(R.string.btn_download_install));
+            }
+
+            @Override
+            public void onReady(File apk) {
+                updateBusy = false;
+                btnCheckUpdate.setEnabled(true);
+                btnCheckUpdate.setText(R.string.btn_download_install);
+                if (!UpdateManager.install(MainActivity.this, apk)) {
+                    setUpdateStatus(getString(R.string.fmt_update_failed,
+                            getString(R.string.update_confirm_failed)), R.color.state_bad);
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                updateBusy = false;
+                btnCheckUpdate.setEnabled(true);
+                btnCheckUpdate.setText(R.string.btn_download_install);
+                setUpdateStatus(getString(R.string.fmt_update_failed, message), R.color.state_bad);
+            }
+        });
+    }
+
+    private void setUpdateStatus(String text, int colorRes) {
+        if (text == null || text.isEmpty()) {
+            tvUpdateStatus.setVisibility(View.GONE);
+            return;
+        }
+        tvUpdateStatus.setVisibility(View.VISIBLE);
+        tvUpdateStatus.setText(text);
+        tvUpdateStatus.setTextColor(getColor(colorRes));
+    }
+
+    private void showUpdateNotes(String notes) {
+        if (notes == null || notes.trim().isEmpty()) {
+            tvUpdateNotes.setVisibility(View.GONE);
+            return;
+        }
+        tvUpdateNotes.setVisibility(View.VISIBLE);
+        tvUpdateNotes.setText(getString(R.string.update_notes_label) + "：" + notes.trim());
+    }
+
+    /** 跳到「安装未知应用」授权页；个别 ROM 裁掉了该页面时退化为只给提示。 */
+    private void openInstallPermissionSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES));
+            } catch (Exception ignored) {
+                // 无法直接跳转，用户可自行到「应用详情 → 安装未知应用」开启
+            }
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {

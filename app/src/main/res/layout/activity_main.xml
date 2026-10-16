@@ -246,6 +246,47 @@
                 style="@style/Body" />
         </LinearLayout>
 
+        <!-- 版本更新 -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/update_group_title" />
+
+            <TextView
+                android:id="@+id/tv_update_current"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/tv_update_status"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_update_notes"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn_check_update"
+                style="@style/MiniButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/btn_check_update" />
+        </LinearLayout>
+
         <!-- 使用说明 -->
         <LinearLayout style="@style/Card">
 
